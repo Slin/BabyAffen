@@ -24,7 +24,7 @@ class PlayerListParser(HTMLParser):
 
 	def handle_starttag(self, tag, attrs):
 		if self.isInCountryCell and tag == "img":
-			if attrs[2][1] in ['AL','AD','AT','AZ','BY','BE','BA','BG','HR','CY','CZ','DK','EE','FI','FR','GE','DE','GR','HU','IS','IE', 'IT','KZ','XK','LV','LI','LT','LU','MK','MT','MD','MC','ME','NL','NO','PL','PT','RO','RU','SM','RS','SK', 'SI','ES','SE','CH','TR','UA','GB','VA']:
+			if attrs[2][1] in ['AL','AD','AT','AZ','BY','BE','BA','BG','HR','CY','CZ','DK','EE','FI','FR','GE','DE','GR','HU','IS','IE', 'IT','KZ','XK','LV','LI','LT','LU','MK','MT','MD','MC','ME','NL','NO','PL','PT','RO','RU','SM','RS','SK', 'SI','ES','SE','CH','TR','UA','GB','VA', 'JE', 'RU']:
 				self.isEUPlayer = True
 
 		if self.isInPlayerCell and tag == "a" and self.isEUPlayer:
