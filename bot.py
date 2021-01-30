@@ -2,6 +2,12 @@ import discord
 import json
 import logging
 from colorhash import ColorHash
+from fetchvrmldata import scrape_players, scrape_teams
+
+AUTH_TOKEN = ""
+with open('auth.json') as authFile:
+	data = json.load(authFile)
+	AUTH_TOKEN = data['token']
 
 logger = logging.getLogger('discord')
 logger.setLevel(logging.DEBUG)
@@ -10,22 +16,22 @@ logFileHandler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)
 logger.addHandler(logFileHandler)
 
 playerData = {}
-with open('playerdata.json') as file:
-	playerData = json.load(file)
+def load_player_data():
+	global playerData
+	with open('playerdata.json') as file:
+		playerData = json.load(file)
 
 teamsData = []
-with open('teamsdata.json') as file:
-	teamsData = json.load(file)
-teamsData.append({'name': 'VRML Master', 'position': len(teamsData)})
-teamsData.append({'name': 'VRML Diamond', 'position': len(teamsData)})
-teamsData.append({'name': 'VRML Gold', 'position': len(teamsData)})
-teamsData.append({'name': 'VRML Silver', 'position': len(teamsData)})
-teamsData.append({'name': 'VRML Bronze', 'position': len(teamsData)})
+def load_teams_data():
+	global teamsData
+	with open('teamsdata.json') as file:
+		teamsData = json.load(file)
+	teamsData.append({'name': 'VRML Master', 'position': len(teamsData)})
+	teamsData.append({'name': 'VRML Diamond', 'position': len(teamsData)})
+	teamsData.append({'name': 'VRML Gold', 'position': len(teamsData)})
+	teamsData.append({'name': 'VRML Silver', 'position': len(teamsData)})
+	teamsData.append({'name': 'VRML Bronze', 'position': len(teamsData)})
 
-AUTH_TOKEN = ""
-with open('auth.json') as authFile:
-	data = json.load(authFile)
-	AUTH_TOKEN = data['token']
 
 intents = discord.Intents.default()
 intents.members = True
@@ -37,11 +43,12 @@ async def on_ready():
 
 @client.event
 async def on_message(message):
+	global teamsData
 	if message.author == client.user:
 		return
 
 	#Print some basic information about a team for any mentioned user
-	if message.content.startswith('$team'):
+	if message.content.startswith('!team'):
 		for member in message.mentions:
 			playerDiscordHandle = member.name + "#" + member.discriminator
 			player = None
@@ -57,7 +64,6 @@ async def on_message(message):
 	if message.author.id != 329735546467385344:
 		return
 
-
 	clientRolePosition = 0
 	for role in message.guild.roles:
 		if role.name == 'Echo EU - VRML Bridge':
@@ -65,7 +71,7 @@ async def on_message(message):
 			break
 
 	#Create new team and division roles for everyone / update them if they changed
-	if message.content.startswith('$update_roles'):
+	if message.content.startswith('!update_roles'):
 		divisionRoles = []
 		rolesToDelete = []
 		for role in message.guild.roles:
@@ -136,7 +142,7 @@ async def on_message(message):
 
 
 	#Update the order of team roles to match the VRML EU ranking
-	if message.content.startswith('$update_ranking'):
+	if message.content.startswith('!update_ranking'):
 		vrmlRoles = {}
 		for role in message.guild.roles:
 			if role.position < clientRolePosition and role.position != 0:
@@ -160,7 +166,7 @@ async def on_message(message):
 
 
 	#Deletes all team and division roles from the server
-	if message.content.startswith('$clear_roles'):
+	if message.content.startswith('!clear_roles'):
 		print("clear roles")
 		rolesToDelete = [role for role in message.guild.roles if role.position < clientRolePosition and role.position != 0]
 		for role in rolesToDelete:
@@ -168,7 +174,7 @@ async def on_message(message):
 			await role.delete()
 
 
-	if message.content.startswith('$update_color'):
+	if message.content.startswith('!update_color'):
 		allRoles = {}
 		for role in message.guild.roles:
 			if role.position < clientRolePosition and role.position != 0:
@@ -180,10 +186,17 @@ async def on_message(message):
 				await allRoles[team['name']].edit(colour=discord.Colour.from_rgb(color.rgb[0], color.rgb[1], color.rgb[2]))
 
 
-	#Just testing stuff...
-	if message.content.startswith('$my_roles'):
-		for role in message.guild.roles:
-			print(role.name + " - " + str(role.position))
+	#Download latest teams data
+	if message.content.startswith('!scrape_teams'):
+		scrape_teams()
+		load_teams_data()
+
+
+	#Download latest players data
+	if message.content.startswith('!scrape_players'):
+		scrape_players()
+		load_player_data()
+
 
 
 #Automatically assign team and division role for new members when joining the server

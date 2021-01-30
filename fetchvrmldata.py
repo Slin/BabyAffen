@@ -3,11 +3,6 @@ import time
 from html.parser import HTMLParser
 import json
 
-#data = {"encrValue":"RXEzNy9vYi9tSXM90", "name":"Slin#8120"}
-#url = "https://vrmasterleague.com/Services.asmx/GetPlayersByDiscordHandle"
-#response = requests.post(url, data)
-#print(response.content)
-
 class PlayerListParser(HTMLParser):
 	def __init__(self):
 		HTMLParser.__init__(self)
@@ -157,72 +152,72 @@ class TeamListParser(HTMLParser):
 			self.teamNames.append(str(data))
 
 
-playerListParser = PlayerListParser()
-url = "https://vrmasterleague.com/EchoArena/Players/List/?posMin="
-numberOfPlayers = 1
-counter = 0
-while counter < numberOfPlayers:
-	playerListParser.playerCount = 0
-	response = requests.get(url + str(counter))
-	playerListParser.feed(str(response.content))
-	numberOfPlayers = playerListParser.playerCount
-	counter += 99
-	time.sleep(5)
+def scrape_players():
+	playerListParser = PlayerListParser()
+	url = "https://vrmasterleague.com/EchoArena/Players/List/?posMin="
+	numberOfPlayers = 1
+	counter = 0
+	while counter < numberOfPlayers:
+		playerListParser.playerCount = 0
+		response = requests.get(url + str(counter))
+		playerListParser.feed(str(response.content))
+		numberOfPlayers = playerListParser.playerCount
+		counter += 99
+		time.sleep(5)
 
-print("Total number of players: " + str(numberOfPlayers))
-print("Number of EU players: " + str(len(playerListParser.players)))
-playerData = {}
-teamList = []
-for i, player in enumerate(playerListParser.players):
-	playerParser = PlayerParser()
-	response = requests.get("https://vrmasterleague.com" + player)
-	playerParser.feed(str(response.content))
-	if not playerParser.discordID or playerParser.discordID == "Unlinked":
-		continue
+	print("Total number of players: " + str(numberOfPlayers))
+	print("Number of EU players: " + str(len(playerListParser.players)))
+	playerData = {}
+	teamList = []
+	for i, player in enumerate(playerListParser.players):
+		playerParser = PlayerParser()
+		response = requests.get("https://vrmasterleague.com" + player)
+		playerParser.feed(str(response.content))
+		if not playerParser.discordID or playerParser.discordID == "Unlinked":
+			continue
 
-	playerData[playerParser.discordID] = {"team": playerListParser.teams[i]}
-	if not playerListParser.teams[i] in teamList:
-		teamList.append(playerListParser.teams[i])
-	time.sleep(1)
+		playerData[playerParser.discordID] = {"team": playerListParser.teams[i]}
+		if not playerListParser.teams[i] in teamList:
+			teamList.append(playerListParser.teams[i])
+		time.sleep(1)
 
-teamData = {}
-for team in teamList:
-	teamParser = TeamParser()
-	response = requests.get("https://vrmasterleague.com" + team)
-	teamParser.feed(str(response.content))
-	teamData[team] = {"name": teamParser.teamName, "division": teamParser.teamDivision, "mmr": teamParser.teamMMR}
-	time.sleep(1)
+	teamData = {}
+	for team in teamList:
+		teamParser = TeamParser()
+		response = requests.get("https://vrmasterleague.com" + team)
+		teamParser.feed(str(response.content))
+		teamData[team] = {"name": teamParser.teamName, "division": teamParser.teamDivision, "mmr": teamParser.teamMMR}
+		time.sleep(1)
 
-for key in playerData:
-	team = teamData[playerData[key]["team"]]
-	del playerData[key]["team"]
-	playerData[key]["teamName"] = team["name"]
-	playerData[key]["teamDivision"] = team["division"]
-	playerData[key]["teamMMR"] = team["mmr"]
+	for key in playerData:
+		team = teamData[playerData[key]["team"]]
+		del playerData[key]["team"]
+		playerData[key]["teamName"] = team["name"]
+		playerData[key]["teamDivision"] = team["division"]
+		playerData[key]["teamMMR"] = team["mmr"]
 
-print(playerData)
+	print(playerData)
 
-with open('playerdata.json', 'w') as outfile:
-	json.dump(playerData, outfile)
+	with open('playerdata.json', 'w') as outfile:
+		json.dump(playerData, outfile)
 
+def scrape_teams():
+	teamListParser = TeamListParser()
+	url = "https://vrmasterleague.com/EchoArena/Standings/N2xDeWlHMGUvZGc90?rankMin="
+	numberOfTeams = 110
+	counter = 0
+	while counter < numberOfTeams:
+		response = requests.get(url + str(counter))
+		teamListParser.feed(str(response.content))
+		counter += 99
+		time.sleep(1)
 
+	teamData = []
+	for i, name in enumerate(teamListParser.teamNames):
+		teamData.append({'position': teamListParser.teamPositions[i], 'name':name})
+	teamData = sorted(teamData, key=lambda k: k['position']) 
 
-teamListParser = TeamListParser()
-url = "https://vrmasterleague.com/EchoArena/Standings/N2xDeWlHMGUvZGc90?rankMin="
-numberOfTeams = 110
-counter = 0
-while counter < numberOfTeams:
-	response = requests.get(url + str(counter))
-	teamListParser.feed(str(response.content))
-	counter += 99
-	time.sleep(1)
+	print(teamData)
 
-teamData = []
-for i, name in enumerate(teamListParser.teamNames):
-	teamData.append({'position': teamListParser.teamPositions[i], 'name':name})
-teamData = sorted(teamData, key=lambda k: k['position']) 
-
-print(teamData)
-
-with open('teamsdata.json', 'w') as outfile:
-	json.dump(teamData, outfile)
+	with open('teamsdata.json', 'w') as outfile:
+		json.dump(teamData, outfile)
