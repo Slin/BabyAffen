@@ -4,62 +4,59 @@ import logging
 from colorhash import ColorHash
 from fetchvrmldata import scrape_players, scrape_teams
 
-AUTH_TOKEN = ""
-with open('auth.json') as authFile:
-	data = json.load(authFile)
-	AUTH_TOKEN = data['token']
+class BotActions:
+	def __init__(self, client):
+		self.client = client
+		self.playerData = []
+		self.teamsData = []
 
-logger = logging.getLogger('discord')
-logger.setLevel(logging.DEBUG)
-logFileHandler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
-logFileHandler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
-logger.addHandler(logFileHandler)
+		self.load_player_data()
+		self.load_teams_data()
 
-playerData = {}
-def load_player_data():
-	global playerData
-	with open('playerdata.json') as file:
-		playerData = json.load(file)
 
-teamsData = {}
-def load_teams_data():
-	global teamsData
-	with open('teamsdata.json') as file:
-		teamsData = json.load(file)
+	def load_player_data(self):
+		with open('playerdata.json') as file:
+			self.playerData = json.load(file)
 
-load_player_data()
-load_teams_data()
 
-intents = discord.Intents.default()
-intents.members = True
-client = discord.Client(intents=intents)
+	def load_teams_data(self):
+		with open('teamsdata.json') as file:
+			self.teamsData = json.load(file)
 
-@client.event
-async def on_ready():
-	print('Logged in as {0.user}'.format(client))
 
-@client.event
-async def on_message(message):
-	global teamsData
-	if message.author == client.user:
-		return
+	def update_teams_data(self):
+		scrape_teams()
+		self.load_teams_data()
 
-	if message.author.id != 329735546467385344:
-		return
 
-	clientRolePosition = 0
-	for role in message.guild.roles:
-		if role.name == 'Echo EU - VRML Bridge':
-			clientRolePosition = role.position
-			break
+	def update_player_data(self):
+		scrape_players()
+		self.load_player_data()
+
 
 	#Create new team and division roles for everyone / update them if they changed
-	if message.content.startswith('!update_roles'):
-		print("start updating users")
+	async def update_roles(self):
+		for guild in self.client.guilds:
+			await self.update_roles_for_guild(guild)
+
+
+	#Create new team and division roles for everyone in the guild / update them if they changed
+	async def update_roles_for_guild(self, guild):
+		print("start updating user roles in " + guild.name)
+
+		if len(self.playerData) == 0:
+			print("no player data. aborting...")
+			return
+
+		clientRolePosition = 0
+		for role in guild.roles:
+			if role.name == 'Echo EU - VRML Bridge':
+				clientRolePosition = role.position
+				break
 
 		divisionRoles = []
 		rolesToDelete = []
-		for role in message.guild.roles:
+		for role in guild.roles:
 			if role.position < clientRolePosition and role.position != 0:
 				rolesToDelete.append(role.name)
 			if role.name == 'VRML Master':
@@ -73,13 +70,13 @@ async def on_message(message):
 			if role.name == 'VRML Bronze':
 				divisionRoles.append(role)
 
-		for member in message.guild.members:
+		for member in guild.members:
 			playerDiscordHandle = member.name + "#" + member.discriminator
 			player = None
-			if playerDiscordHandle in playerData:
-				player = playerData[playerDiscordHandle]
+			if playerDiscordHandle in self.playerData:
+				player = self.playerData[playerDiscordHandle]
 			if player:
-				team = teamsData[player["teamID"]]
+				team = self.teamsData[player["teamID"]]
 				teamName = team["name"]
 				teamDivision = 'VRML ' + team["division"]
 
@@ -87,18 +84,18 @@ async def on_message(message):
 				playerRolesToDelete = []
 				memberRoleNames = [x.name for x in member.roles]
 				if not teamName in memberRoleNames:
-					teamRole = next((x for x in message.guild.roles if x.name == teamName), None)
+					teamRole = next((x for x in guild.roles if x.name == teamName), None)
 					if not teamRole:
-						teamRole = await message.guild.create_role(name=teamName, hoist=True, mentionable=True)
+						teamRole = await guild.create_role(name=teamName, hoist=True, mentionable=True)
 					playerRolesToAdd.append(teamRole)
 					for role in member.roles:
 						if role.position < clientRolePosition and role.position != 0 and not role in divisionRoles:
 							playerRolesToDelete.append(role)
 
 				if not teamDivision in memberRoleNames:
-					tierRole = next((x for x in message.guild.roles if x.name == teamDivision), None)
+					tierRole = next((x for x in guild.roles if x.name == teamDivision), None)
 					if not tierRole:
-						tierRole = await message.guild.create_role(name=teamDivision, hoist=False, mentionable=True)
+						tierRole = await guild.create_role(name=teamDivision, hoist=False, mentionable=True)
 					playerRolesToAdd.append(tierRole)
 					for role in member.roles:
 						if role in divisionRoles:
@@ -123,23 +120,36 @@ async def on_message(message):
 					await member.remove_roles(*playerVRMLRoles)
 
 		for roleName in rolesToDelete:
-			role = next((x for x in message.guild.roles if x.name == roleName), None)
+			role = next((x for x in guild.roles if x.name == roleName), None)
 			await role.delete()
 
-		print("finished updating users")
+		print("finished updating user roles")
 
 
 	#Update the order of team roles to match the VRML EU ranking
-	if message.content.startswith('!update_ranking'):
+	async def update_ranking(self):
+		for guild in self.client.guilds:
+			await self.update_roles_for_guild(guild)
+
+
+	#Update the order of team roles in guild to match the VRML EU ranking
+	async def update_ranking_for_guild(self, guild):
 		print("start updating team ranking")
+
+		clientRolePosition = 0
+		for role in guild.roles:
+			if role.name == 'Echo EU - VRML Bridge':
+				clientRolePosition = role.position
+				break
+
 		vrmlRoles = {}
-		for role in message.guild.roles:
+		for role in guild.roles:
 			if role.position < clientRolePosition and role.position != 0:
 				vrmlRoles[role.name] = role
 
 		newTeamsData = []
-		for key in teamsData:
-			team = teamsData[key]
+		for key in self.teamsData:
+			team = self.teamsData[key]
 			teamName = team['name']
 			if teamName in vrmlRoles:
 				newTeamsData.append(team)
@@ -155,78 +165,131 @@ async def on_message(message):
 			if teamName in vrmlRoles:
 				teamPositionDict[vrmlRoles[teamName]] = len(newTeamsData) - position
 
-		await message.guild.edit_role_positions(positions=teamPositionDict)
-
+		await guild.edit_role_positions(positions=teamPositionDict)
 		print("finished updating team ranking")
 
 
-	#Deletes all team and division roles from the server
-	if message.content.startswith('!clear_roles'):
+	#Update the master tier team role colors
+	async def update_ranking(self):
+		for guild in self.client.guilds:
+			await self.update_colors_for_guild(guild)
+
+
+	#Update the master tier team role colors for guild
+	async def update_colors_for_guild(self, guild):
+		print("start updating colors")
+
+		clientRolePosition = 0
+		for role in guild.roles:
+			if role.name == 'Echo EU - VRML Bridge':
+				clientRolePosition = role.position
+				break
+
+		allRoles = {}
+		for role in guild.roles:
+			if role.position < clientRolePosition and role.position != 0:
+				allRoles[role.name] = role
+
+		for key in self.teamsData:
+			team = self.teamsData[key]
+			if team['name'] in allRoles:
+				if team['position'] <= 10: #is top 10 team
+					color = ColorHash(team['name'])
+					await allRoles[team['name']].edit(colour=discord.Colour.from_rgb(color.rgb[0], color.rgb[1], color.rgb[2]))
+				else:
+					await allRoles[team['name']].edit(colour=discord.Colour.default())
+
+		print("finished updating colors")
+
+
+	#Deletes all bot created team and division roles from the guild
+	async def clear_roles_for_guild(self, guild):
 		print("start clearing roles")
-		rolesToDelete = [role for role in message.guild.roles if role.position < clientRolePosition and role.position != 0]
+
+		clientRolePosition = 0
+		for role in guild.roles:
+			if role.name == 'Echo EU - VRML Bridge':
+				clientRolePosition = role.position
+				break
+
+		rolesToDelete = [role for role in guild.roles if role.position < clientRolePosition and role.position != 0]
 		for role in rolesToDelete:
 			print("delete role: " + role.name)
 			await role.delete()
 		print("finished clearing roles")
 
 
-	if message.content.startswith('!update_color'):
-		print("start updating colors")
-		allRoles = {}
-		for role in message.guild.roles:
-			if role.position < clientRolePosition and role.position != 0:
-				allRoles[role.name] = role
 
-		for key in teamsData:
-			team = teamsData[key]
-			if team['name'] in allRoles and team['position'] <= 10: #is top 10 team
-				color = ColorHash(team['name'])
-				await allRoles[team['name']].edit(colour=discord.Colour.from_rgb(color.rgb[0], color.rgb[1], color.rgb[2]))
-		print("finished updating colors")
 
+AUTH_TOKEN = ""
+with open('auth.json') as authFile:
+	data = json.load(authFile)
+	AUTH_TOKEN = data['token']
+
+logger = logging.getLogger('discord')
+logger.setLevel(logging.DEBUG)
+logFileHandler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
+logFileHandler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
+logger.addHandler(logFileHandler)
+
+intents = discord.Intents.none()
+intents.guilds = True
+intents.members = True
+intents.messages = True
+client = discord.Client(intents=intents)
+
+actions = BotActions(client)
+
+@client.event
+async def on_ready():
+	print('Logged in as {0.user}'.format(client))
+
+@client.event
+async def on_message(message):
+	if message.author == client.user:
+		return
+
+	if not message.author.guild_permissions.administrator:
+		return
+
+	#Create new team and division roles for everyone / update them if they changed
+	if message.content.startswith('!update_roles'):
+		await actions.update_roles_for_guild(message.guild)
+
+	#Update the order of team roles to match the VRML EU ranking
+	if message.content.startswith('!update_ranking'):
+		await actions.update_ranking_for_guild(message.guild)
+
+	#Update the master tier team colors
+	if message.content.startswith('!update_colors'):
+		await actions.update_colors_for_guild(message.guild)
+
+	#Deletes all team and division roles from the server
+	if message.content.startswith('!clear_roles'):
+		await actions.clear_roles_for_guild(message.guild)
 
 	#Download latest teams data
 	if message.content.startswith('!scrape_teams'):
-		scrape_teams()
-		load_teams_data()
-
+		actions.update_teams_data()
 
 	#Download latest players data
 	if message.content.startswith('!scrape_players'):
-		scrape_players()
-		load_player_data()
+		actions.update_player_data()
 
+	if message.content.startswith('!users_for_role'):
+		roleToFind = message.content[15:].strip()
+		for member in message.guild.members:
+			for role in member.roles:
+				if role.name == roleToFind:
+					await message.channel.send("user with role " + roleToFind + ": " + member.name)
 
 
 #Automatically assign team and division role for new members when joining the server
 @client.event
 async def on_member_join(member):
-	playerDiscordHandle = member.name + "#" + member.discriminator
-	player = None
-	if playerDiscordHandle in playerData:
-		player = playerData[playerDiscordHandle]
-
-	if player:
-		team = teamsData[player["teamID"]]
-		teamName = team["name"]
-		teamDivision = "VRML " + team["division"]
-
-		guild = client.guilds[0]
-
-		playerRolesToAdd = []
-		teamRole = next((x for x in guild.roles if x.name == teamName), None)
-		if not teamRole:
-			teamRole = await guild.create_role(name=teamName, hoist=True, mentionable=True)
-		playerRolesToAdd.append(teamRole)
-
-		tierRole = next((x for x in guild.roles if x.name == teamDivision), None)
-		if not tierRole:
-			tierRole = await guild.create_role(name=teamDivision, hoist=False, mentionable=True)
-		playerRolesToAdd.append(tierRole)
-
-		if len(playerRolesToAdd) > 0:
-			print("updating: " + playerDiscordHandle + " - " + teamName + " - " + teamDivision)
-			await member.add_roles(*playerRolesToAdd)
+	await actions.update_roles_for_guild(member.guild)
 
 
 client.run(AUTH_TOKEN)
+
+
