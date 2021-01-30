@@ -21,17 +21,14 @@ def load_player_data():
 	with open('playerdata.json') as file:
 		playerData = json.load(file)
 
-teamsData = []
+teamsData = {}
 def load_teams_data():
 	global teamsData
 	with open('teamsdata.json') as file:
 		teamsData = json.load(file)
-	teamsData.append({'name': 'VRML Master', 'position': len(teamsData)})
-	teamsData.append({'name': 'VRML Diamond', 'position': len(teamsData)})
-	teamsData.append({'name': 'VRML Gold', 'position': len(teamsData)})
-	teamsData.append({'name': 'VRML Silver', 'position': len(teamsData)})
-	teamsData.append({'name': 'VRML Bronze', 'position': len(teamsData)})
 
+load_player_data()
+load_teams_data()
 
 intents = discord.Intents.default()
 intents.members = True
@@ -47,20 +44,6 @@ async def on_message(message):
 	if message.author == client.user:
 		return
 
-	#Print some basic information about a team for any mentioned user
-	if message.content.startswith('!team'):
-		for member in message.mentions:
-			playerDiscordHandle = member.name + "#" + member.discriminator
-			player = None
-			if playerDiscordHandle in playerData:
-				player = playerData[playerDiscordHandle]
-			if player:
-				teamName = player["teamName"].replace('\\', '')
-				await message.channel.send("Name: " + teamName + " - Division: " + player["teamDivision"] + " - MMR: " + str(player["teamMMR"]))
-			else:
-				await message.channel.send("Not in a team")
-
-
 	if message.author.id != 329735546467385344:
 		return
 
@@ -72,6 +55,8 @@ async def on_message(message):
 
 	#Create new team and division roles for everyone / update them if they changed
 	if message.content.startswith('!update_roles'):
+		print("start updating users")
+
 		divisionRoles = []
 		rolesToDelete = []
 		for role in message.guild.roles:
@@ -94,8 +79,9 @@ async def on_message(message):
 			if playerDiscordHandle in playerData:
 				player = playerData[playerDiscordHandle]
 			if player:
-				teamName = player["teamName"].replace('\\', '')
-				teamDivision = 'VRML ' + player["teamDivision"]
+				team = teamsData[player["teamID"]]
+				teamName = team["name"]
+				teamDivision = 'VRML ' + team["division"]
 
 				playerRolesToAdd = []
 				playerRolesToDelete = []
@@ -140,50 +126,63 @@ async def on_message(message):
 			role = next((x for x in message.guild.roles if x.name == roleName), None)
 			await role.delete()
 
+		print("finished updating users")
+
 
 	#Update the order of team roles to match the VRML EU ranking
 	if message.content.startswith('!update_ranking'):
+		print("start updating team ranking")
 		vrmlRoles = {}
 		for role in message.guild.roles:
 			if role.position < clientRolePosition and role.position != 0:
 				vrmlRoles[role.name] = role
 
 		newTeamsData = []
-		for team in teamsData:
-			teamName = team['name'].replace('\\', '')
+		for key in teamsData:
+			team = teamsData[key]
+			teamName = team['name']
 			if teamName in vrmlRoles:
 				newTeamsData.append(team)
 
+		divisions = ["VRML Master", "VRML Diamond", "VRML Gold", "VRML Silver", "VRML Bronze"]
+		for division in divisions:
+			if division in vrmlRoles:
+				newTeamsData.append({'name': division})
+
 		teamPositionDict = {}
 		for position, team in enumerate(newTeamsData):
-			teamName = team['name'].replace('\\', '')
+			teamName = team['name']
 			if teamName in vrmlRoles:
 				teamPositionDict[vrmlRoles[teamName]] = len(newTeamsData) - position
 
-		print(teamPositionDict)
-
 		await message.guild.edit_role_positions(positions=teamPositionDict)
+
+		print("finished updating team ranking")
 
 
 	#Deletes all team and division roles from the server
 	if message.content.startswith('!clear_roles'):
-		print("clear roles")
+		print("start clearing roles")
 		rolesToDelete = [role for role in message.guild.roles if role.position < clientRolePosition and role.position != 0]
 		for role in rolesToDelete:
 			print("delete role: " + role.name)
 			await role.delete()
+		print("finished clearing roles")
 
 
 	if message.content.startswith('!update_color'):
+		print("start updating colors")
 		allRoles = {}
 		for role in message.guild.roles:
 			if role.position < clientRolePosition and role.position != 0:
 				allRoles[role.name] = role
 
-		for team in teamsData:
+		for key in teamsData:
+			team = teamsData[key]
 			if team['name'] in allRoles and team['position'] <= 10: #is top 10 team
 				color = ColorHash(team['name'])
 				await allRoles[team['name']].edit(colour=discord.Colour.from_rgb(color.rgb[0], color.rgb[1], color.rgb[2]))
+		print("finished updating colors")
 
 
 	#Download latest teams data
@@ -208,8 +207,9 @@ async def on_member_join(member):
 		player = playerData[playerDiscordHandle]
 
 	if player:
-		teamName = player["teamName"].replace('\\', '')
-		teamDivision = player["teamDivision"]
+		team = teamsData[player["teamID"]]
+		teamName = team["name"]
+		teamDivision = "VRML " + team["division"]
 
 		guild = client.guilds[0]
 
