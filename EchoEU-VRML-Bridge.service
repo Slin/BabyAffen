@@ -1,0 +1,14 @@
+[Unit]
+Description=Discord bot that scrapes player and team data from the VRML website and updates roles on discord accordingly
+After=multi-user.target
+Conflicts=getty@tty1.service
+
+[Service]
+Type=simple
+WorkingDirectory=/home/slin/www/EchoEU-VRML-Bridge-Bot
+ExecStartPre=sh /home/slin/www/EchoEU-VRML-Bridge-Bot/setup.sh
+ExecStart=/home/slin/www/EchoEU-VRML-Bridge-Bot/python-env/bin/python3 /home/slin/www/EchoEU-VRML-Bridge-Bot/bot.py
+StandardInput=tty-force
+
+[Install]
+WantedBy=multi-user.target
