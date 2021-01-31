@@ -3,15 +3,14 @@ import json
 import logging
 from colorhash import ColorHash
 from fetchvrmldata import scrape_players, scrape_teams
+from discord.ext import commands, tasks
 
 class BotActions:
-	def __init__(self, client):
+	def __init__(self, client, logger):
 		self.client = client
 		self.playerData = []
 		self.teamsData = []
-
-		self.load_player_data()
-		self.load_teams_data()
+		self.logger = logger
 
 
 	def load_player_data(self):
@@ -42,10 +41,14 @@ class BotActions:
 
 	#Create new team and division roles for everyone in the guild / update them if they changed
 	async def update_roles_for_guild(self, guild):
-		print("start updating user roles in " + guild.name)
+		self.logger.info("start updating user roles in " + guild.name)
 
 		if len(self.playerData) == 0:
-			print("no player data. aborting...")
+			self.logger.info("no player data. aborting...")
+			return
+
+		if len(self.teamsData) == 0:
+			self.logger.info("no teams data. aborting...")
 			return
 
 		clientRolePosition = 0
@@ -102,7 +105,7 @@ class BotActions:
 							playerRolesToDelete.append(role)
 
 				if len(playerRolesToAdd) > 0:
-					print("updating: " + playerDiscordHandle + " - " + teamName + " - " + teamDivision)
+					self.logger.info("updating: " + playerDiscordHandle + " - " + teamName + " - " + teamDivision)
 					await member.add_roles(*playerRolesToAdd)
 
 				if len(playerRolesToDelete) > 0:
@@ -116,14 +119,14 @@ class BotActions:
 			else:
 				playerVRMLRoles = [x for x in member.roles if x.position < clientRolePosition and x.position != 0]
 				if len(playerVRMLRoles) > 0:
-					print("removing vrml roles for " + playerDiscordHandle)
+					self.logger.info("removing vrml roles for " + playerDiscordHandle)
 					await member.remove_roles(*playerVRMLRoles)
 
 		for roleName in rolesToDelete:
 			role = next((x for x in guild.roles if x.name == roleName), None)
 			await role.delete()
 
-		print("finished updating user roles")
+		self.logger.info("finished updating user roles")
 
 
 	#Update the order of team roles to match the VRML EU ranking
@@ -134,7 +137,11 @@ class BotActions:
 
 	#Update the order of team roles in guild to match the VRML EU ranking
 	async def update_ranking_for_guild(self, guild):
-		print("start updating team ranking")
+		self.logger.info("start updating team ranking")
+
+		if len(self.teamsData) == 0:
+			self.logger.info("no teams data. aborting...")
+			return
 
 		clientRolePosition = 0
 		for role in guild.roles:
@@ -166,18 +173,22 @@ class BotActions:
 				teamPositionDict[vrmlRoles[teamName]] = len(newTeamsData) - position
 
 		await guild.edit_role_positions(positions=teamPositionDict)
-		print("finished updating team ranking")
+		self.logger.info("finished updating team ranking")
 
 
 	#Update the master tier team role colors
-	async def update_ranking(self):
+	async def update_colors(self):
 		for guild in self.client.guilds:
 			await self.update_colors_for_guild(guild)
 
 
 	#Update the master tier team role colors for guild
 	async def update_colors_for_guild(self, guild):
-		print("start updating colors")
+		self.logger.info("start updating colors")
+
+		if len(self.teamsData) == 0:
+			self.logger.info("no teams data. aborting...")
+			return
 
 		clientRolePosition = 0
 		for role in guild.roles:
@@ -199,12 +210,12 @@ class BotActions:
 				else:
 					await allRoles[team['name']].edit(colour=discord.Colour.default())
 
-		print("finished updating colors")
+		self.logger.info("finished updating colors")
 
 
 	#Deletes all bot created team and division roles from the guild
 	async def clear_roles_for_guild(self, guild):
-		print("start clearing roles")
+		self.logger.info("start clearing roles")
 
 		clientRolePosition = 0
 		for role in guild.roles:
@@ -214,9 +225,9 @@ class BotActions:
 
 		rolesToDelete = [role for role in guild.roles if role.position < clientRolePosition and role.position != 0]
 		for role in rolesToDelete:
-			print("delete role: " + role.name)
+			self.logger.info("delete role: " + role.name)
 			await role.delete()
-		print("finished clearing roles")
+		self.logger.info("finished clearing roles")
 
 
 
@@ -227,7 +238,7 @@ with open('auth.json') as authFile:
 	AUTH_TOKEN = data['token']
 
 logger = logging.getLogger('discord')
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 logFileHandler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
 logFileHandler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
 logger.addHandler(logFileHandler)
@@ -238,11 +249,11 @@ intents.members = True
 intents.messages = True
 client = discord.Client(intents=intents)
 
-actions = BotActions(client)
+actions = BotActions(client, logger)
 
 @client.event
 async def on_ready():
-	print('Logged in as {0.user}'.format(client))
+	logger.info('Logged in as {0.user}'.format(client))
 
 @client.event
 async def on_message(message):
@@ -290,6 +301,26 @@ async def on_member_join(member):
 	await actions.update_roles_for_guild(member.guild)
 
 
+@tasks.loop(hours=2)
+async def update_rankings():
+	actions.update_teams_data()
+	await actions.update_ranking()
+	await actions.update_colors()
+
+@update_rankings.before_loop
+async def before_update_rankings():
+	await client.wait_until_ready()
+
+
+@tasks.loop(hours=24)
+async def update_players():
+	actions.update_player_data()
+	await actions.update_roles()
+
+@update_players.before_loop
+async def before_update_players():
+	await client.wait_until_ready()
+
+update_players.start()
+update_rankings.start()
 client.run(AUTH_TOKEN)
-
-
