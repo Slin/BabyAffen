@@ -168,11 +168,19 @@ class BotActions:
 				newTeamsData.append({'name': division})
 
 		teamPositionDict = {}
+		addedRoles = []
 		for position, team in enumerate(newTeamsData):
 			teamName = team['name']
 			if teamName in vrmlRoles:
-				teamPositionDict[vrmlRoles[teamName]] = len(newTeamsData) - position
+				addedRoles.append(teamName)
+				teamPositionDict[vrmlRoles[teamName]] = len(newTeamsData) - position - 1
 
+		for role in vrmlRoles:
+			if not role in addedRoles:
+				teamPositionDict[vrmlRoles[role]] = 1
+				self.logger.info("Team role (" + role + ") not in teams data!")
+
+		print(teamPositionDict)
 		await guild.edit_role_positions(positions=teamPositionDict)
 		self.logger.info("finished updating team ranking")
 
