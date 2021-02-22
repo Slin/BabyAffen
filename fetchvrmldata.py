@@ -6,6 +6,7 @@ import json
 class PlayerListParser(HTMLParser):
 	def __init__(self):
 		HTMLParser.__init__(self)
+		self.isInPlayerCount = False
 		self.isInTable = False
 		self.isInTableRow = False
 		self.isInCountryCell = False
@@ -22,6 +23,9 @@ class PlayerListParser(HTMLParser):
 		self.countries = []
 
 	def handle_starttag(self, tag, attrs):
+		if tag == "div" and len(attrs) > 0 and len(attrs[0]) > 0 and attrs[0][1] == "players-list-header-count":
+			self.isInPlayerCount = True
+
 		if self.isInCountryCell and tag == "img":
 			if attrs[2][1] in ['AL','AD','AT','AZ','BY','BE','BA','BG','HR','CY','CZ','DK','EE','FI','FR','GE','DE','GR','HU','IS','IE', 'IT','KZ','XK','LV','LI','LT','LU','MK','MT','MD','MC','ME','NL','NO','PL','PT','RO','RU','SM','RS','SK', 'SI','ES','SE','CH','TR','UA','GB','VA', 'JE', 'RU']:
 				self.isEUPlayer = True
@@ -52,6 +56,9 @@ class PlayerListParser(HTMLParser):
 			self.isInPlayerNameCell = True
 
 	def handle_endtag(self, tag):
+		if tag == "div" and self.isInPlayerCount:
+			self.isInPlayerCount = False
+
 		if tag == "td" and self.isInCountryCell:
 			self.isInCountryCell = False
 
@@ -74,9 +81,11 @@ class PlayerListParser(HTMLParser):
 				self.names.append("No Name")
 
 	def handle_data(self, data):
-		if data.startswith("There are currently "):
-			if data.endswith(" players in active teams."):
-				self.playerCount = int(data[20:-25])
+		if self.isInPlayerCount:
+			numbers = [int(s) for s in str(data).split() if s.isdigit()]
+			if len(numbers) > 0:
+				self.playerCount = numbers[0]
+				print(self.playerCount)
 
 		if self.isInPlayerNameCell and self.isEUPlayer:
 			self.didHaveName = True
@@ -156,6 +165,55 @@ class TeamListParser(HTMLParser):
 		if self.isInTeamName:
 			self.teamNames.append(str(data).replace('\\', ''))
 
+'''
+class MatchesListParser(HTMLParser):
+	def __init__(self):
+		HTMLParser.__init__(self)
+		self.isInTeamName = False
+		self.isInTeamPosition = False
+		self.isInTeamDivision = False
+		self.teamIDs = []
+		self.teamNames = []
+		self.teamLogos = []
+		self.teamPositions = []
+		self.teamDivisions = []
+
+	def handle_starttag(self, tag, attrs):
+		if tag == "td" and len(attrs) > 0 and attrs[0][1] == "pos_cell":
+			self.isInTeamPosition = True
+
+		if tag == "td" and len(attrs) > 0 and attrs[0][1] == "div_cell":
+			self.isInTeamDivision = True
+
+		if tag == "a" and len(attrs) > 1 and attrs[1][1] == "team_link":
+			self.teamIDs.append(str(attrs[0][1]))
+
+		if tag == "img" and len(attrs) > 1 and attrs[1][1] == "team_logo":
+			self.teamLogos.append(str(attrs[0][1]))
+
+		if tag == "span" and len(attrs) > 0 and attrs[0][1] == "team_name":
+			self.isInTeamName = True
+
+		if tag == "img" and self.isInTeamDivision:
+			self.teamDivisions.append(str(attrs[1][1]))
+
+	def handle_endtag(self, tag):
+		if self.isInTeamPosition and tag == "td":
+			self.isInTeamPosition = False
+
+		if self.isInTeamDivision and tag == "td":
+			self.isInTeamDivision = False
+
+		if self.isInTeamName and tag == "span":
+			self.isInTeamName = False
+
+	def handle_data(self, data):
+		if self.isInTeamPosition:
+			self.teamPositions.append(int(data))
+
+		if self.isInTeamName:
+			self.teamNames.append(str(data).replace('\\', ''))
+'''
 
 def scrape_players():
 	print("Start scraping player data")
@@ -212,3 +270,28 @@ def scrape_teams():
 
 	with open('teamsdata.json', 'w') as outfile:
 		json.dump(teamData, outfile)
+
+'''
+def scrape_teams():
+	print("Start scraping team data")
+
+	teamListParser = TeamListParser()
+	url = "https://vrmasterleague.com/EchoArena/Standings/N2xDeWlHMGUvZGc90?rankMin="
+	numberOfTeams = 110
+	counter = 0
+	while counter < numberOfTeams:
+		response = requests.get(url + str(counter))
+		teamListParser.feed(str(response.content))
+		counter += 99
+		time.sleep(1)
+
+	teamData = {}
+	for i, teamID in enumerate(teamListParser.teamIDs):
+		teamData[teamID] = {'position': teamListParser.teamPositions[i], 'name': teamListParser.teamNames[i], 'logo': teamListParser.teamLogos[i], 'division': teamListParser.teamDivisions[i]}
+
+	print("Scraped all team data")
+
+	with open('teamsdata.json', 'w') as outfile:
+		json.dump(teamData, outfile)
+'''
+
