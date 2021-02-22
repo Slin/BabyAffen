@@ -278,7 +278,7 @@ async def on_message(message):
 	if message.author == client.user:
 		return
 
-	if not type(message.author) is Member or not message.author.guild_permissions.administrator:
+	if not type(message.author) is discord.Member or not message.author.guild_permissions.administrator:
 		return
 
 	#Create new team and division roles for everyone / update them if they changed
