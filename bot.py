@@ -90,6 +90,7 @@ class BotActions:
 					teamRole = next((x for x in guild.roles if x.name == teamName), None)
 					if not teamRole:
 						teamRole = await guild.create_role(name=teamName, hoist=True, mentionable=True)
+						self.logger.info("created new role for team: " + teamName)
 					playerRolesToAdd.append(teamRole)
 					for role in member.roles:
 						if role.position < clientRolePosition and role.position != 0 and not role in divisionRoles:
@@ -151,37 +152,42 @@ class BotActions:
 				break
 
 		vrmlRoles = {}
+		rolesToRemove = []
 		for role in guild.roles:
 			if role.position < clientRolePosition and role.position != 0:
-				vrmlRoles[role.name] = role
+				if role.name in vrmlRoles:
+					rolesToRemove.append(role)
+				else:
+					vrmlRoles[role.name] = role
 
-		newTeamsData = []
+		newTeamsList = []
 		for key in self.teamsData:
 			team = self.teamsData[key]
 			teamName = team['name']
 			if teamName in vrmlRoles:
-				newTeamsData.append(team)
+				newTeamsList.append(vrmlRoles[teamName])
 
 		divisions = ["VRML Master", "VRML Diamond", "VRML Gold", "VRML Silver", "VRML Bronze"]
 		for division in divisions:
 			if division in vrmlRoles:
-				newTeamsData.append({'name': division})
-
-		teamPositionDict = {}
-		addedRoles = []
-		for position, team in enumerate(newTeamsData):
-			teamName = team['name']
-			if teamName in vrmlRoles:
-				addedRoles.append(teamName)
-				teamPositionDict[vrmlRoles[teamName]] = len(newTeamsData) - position - 1
+				newTeamsList.append(vrmlRoles[division])
 
 		for role in vrmlRoles:
-			if not role in addedRoles:
-				teamPositionDict[vrmlRoles[role]] = 1
-				self.logger.info("Team role (" + role + ") not in teams data!")
+			if not vrmlRoles[role] in newTeamsList:
+				rolesToRemove.append(vrmlRoles[role])
+
+		newTeamsList.reverse()
+		teamPositionDict = {}
+		for position, role in enumerate(newTeamsList):
+			teamPositionDict[role] = position
 
 		print(teamPositionDict)
 		await guild.edit_role_positions(positions=teamPositionDict)
+
+		for role in rolesToRemove:
+			self.logger.info("deleting unexpected role: " + role.name)
+			await role.delete()
+
 		self.logger.info("finished updating team ranking")
 
 
