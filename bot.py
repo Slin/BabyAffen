@@ -351,11 +351,11 @@ async def update_players():
 async def before_update_players():
 	await client.wait_until_ready()
 
-actions.update_teams_data()
+#actions.update_teams_data()
 
 #actions.load_teams_data()
 #actions.load_player_data()
 
-#update_players.start()
-#update_rankings.start()
-#client.run(AUTH_TOKEN)
+update_players.start()
+update_rankings.start()
+client.run(AUTH_TOKEN)
