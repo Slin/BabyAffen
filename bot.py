@@ -123,6 +123,7 @@ class BotActions:
 					await member.remove_roles(*playerVRMLRoles)
 
 		for roleName in rolesToDelete:
+			self.logger.info("deleting role: " + roleName)
 			role = next((x for x in guild.roles if x.name == roleName), None)
 			await role.delete()
 
@@ -260,32 +261,44 @@ async def on_message(message):
 	if message.author == client.user:
 		return
 
-	if not message.author.guild_permissions.administrator:
+	if not type(message.author) is Member or not message.author.guild_permissions.administrator:
 		return
 
 	#Create new team and division roles for everyone / update them if they changed
 	if message.content.startswith('!update_roles'):
+		await message.channel.send("started updating roles")
 		await actions.update_roles_for_guild(message.guild)
+		await message.channel.send("finished updating roles")
 
 	#Update the order of team roles to match the VRML EU ranking
 	if message.content.startswith('!update_ranking'):
+		await message.channel.send("started updating ranking")
 		await actions.update_ranking_for_guild(message.guild)
+		await message.channel.send("finished updating ranking")
 
 	#Update the master tier team colors
 	if message.content.startswith('!update_colors'):
+		await message.channel.send("started updating colors")
 		await actions.update_colors_for_guild(message.guild)
+		await message.channel.send("finished updating colors")
 
 	#Deletes all team and division roles from the server
 	if message.content.startswith('!clear_roles'):
+		await message.channel.send("started clearing roles")
 		await actions.clear_roles_for_guild(message.guild)
+		await message.channel.send("finished clearing roles")
 
 	#Download latest teams data
 	if message.content.startswith('!scrape_teams'):
+		await message.channel.send("started scraping teams")
 		actions.update_teams_data()
+		await message.channel.send("finished scraping teams")
 
 	#Download latest players data
 	if message.content.startswith('!scrape_players'):
+		await message.channel.send("started scraping players")
 		actions.update_player_data()
+		await message.channel.send("finished scraping players")
 
 	if message.content.startswith('!users_for_role'):
 		roleToFind = message.content[15:].strip()
@@ -320,6 +333,9 @@ async def update_players():
 @update_players.before_loop
 async def before_update_players():
 	await client.wait_until_ready()
+
+#actions.load_teams_data()
+#actions.load_player_data()
 
 update_players.start()
 update_rankings.start()
