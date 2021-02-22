@@ -2,6 +2,7 @@ import requests
 import time
 from html.parser import HTMLParser
 import json
+import logging
 
 class PlayerListParser(HTMLParser):
 	def __init__(self):
@@ -215,8 +216,8 @@ class MatchesListParser(HTMLParser):
 			self.teamNames.append(str(data).replace('\\', ''))
 '''
 
-def scrape_players():
-	print("Start scraping player data")
+def scrape_players(logger):
+	logger.info("Start scraping player data")
 
 	playerListParser = PlayerListParser()
 	url = "https://vrmasterleague.com/EchoArena/Players/List/?posMin="
@@ -230,8 +231,8 @@ def scrape_players():
 		counter += 99
 		time.sleep(1)
 
-	print("Total number of players: " + str(numberOfPlayers))
-	print("Number of EU players: " + str(len(playerListParser.players)))
+	logger.info("Total number of players: " + str(numberOfPlayers))
+	logger.info("Number of EU players: " + str(len(playerListParser.players)))
 	playerData = {}
 	for i, player in enumerate(playerListParser.players):
 		playerParser = PlayerParser()
@@ -243,14 +244,14 @@ def scrape_players():
 		playerData[playerParser.discordID] = {"teamID": playerListParser.teams[i], "name": playerListParser.names[i], "country": playerListParser.countries[i], "logo": playerParser.logo}
 		time.sleep(1)
 
-	print("Scraped all player data")
+	logger.info("Scraped all player data")
 
 	with open('playerdata.json', 'w') as outfile:
 		json.dump(playerData, outfile)
 
 
-def scrape_teams():
-	print("Start scraping team data")
+def scrape_teams(logger):
+	logger.info("Start scraping team data")
 
 	teamListParser = TeamListParser()
 	url = "https://vrmasterleague.com/EchoArena/Standings/N2xDeWlHMGUvZGc90?rankMin="
@@ -266,13 +267,13 @@ def scrape_teams():
 	for i, teamID in enumerate(teamListParser.teamIDs):
 		teamData[teamID] = {'position': teamListParser.teamPositions[i], 'name': teamListParser.teamNames[i], 'logo': teamListParser.teamLogos[i], 'division': teamListParser.teamDivisions[i]}
 
-	print("Scraped all team data")
+	logger.info("Scraped all team data")
 
 	with open('teamsdata.json', 'w') as outfile:
 		json.dump(teamData, outfile)
 
 '''
-def scrape_teams():
+def scrape_teams(logger):
 	print("Start scraping team data")
 
 	teamListParser = TeamListParser()

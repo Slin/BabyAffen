@@ -24,12 +24,12 @@ class BotActions:
 
 
 	def update_teams_data(self):
-		scrape_teams()
+		scrape_teams(self.logger)
 		self.load_teams_data()
 
 
 	def update_player_data(self):
-		scrape_players()
+		scrape_players(self.logger)
 		self.load_player_data()
 
 
@@ -247,10 +247,19 @@ with open('auth.json') as authFile:
 	AUTH_TOKEN = data['token']
 
 logger = logging.getLogger('discord')
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
+
+formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
+
+#Log to file
 logFileHandler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
-logFileHandler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
+logFileHandler.setFormatter(formatter)
 logger.addHandler(logFileHandler)
+
+#Log to console
+logConsoleHandler = logging.StreamHandler()
+logConsoleHandler.setFormatter(formatter)
+logger.addHandler(logConsoleHandler)
 
 intents = discord.Intents.none()
 intents.guilds = True
@@ -342,9 +351,11 @@ async def update_players():
 async def before_update_players():
 	await client.wait_until_ready()
 
+actions.update_teams_data()
+
 #actions.load_teams_data()
 #actions.load_player_data()
 
-update_players.start()
-update_rankings.start()
-client.run(AUTH_TOKEN)
+#update_players.start()
+#update_rankings.start()
+#client.run(AUTH_TOKEN)
