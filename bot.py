@@ -359,8 +359,8 @@ async def on_member_join(member):
 
 #actions.update_teams_data()
 
-#actions.load_teams_data()
-#actions.load_player_data()
+actions.load_teams_data()
+actions.load_player_data()
 
 #update_players.start()
 #update_rankings.start()
