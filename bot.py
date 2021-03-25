@@ -253,7 +253,7 @@ with open('auth.json') as authFile:
 	AUTH_TOKEN = data['token']
 
 logger = logging.getLogger('discord')
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 formatter = logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s')
 

@@ -86,7 +86,6 @@ class PlayerListParser(HTMLParser):
 			numbers = [int(s) for s in str(data).split() if s.isdigit()]
 			if len(numbers) > 0:
 				self.playerCount = numbers[0]
-				print(self.playerCount)
 
 		if self.isInPlayerNameCell and self.isEUPlayer:
 			self.didHaveName = True
@@ -254,7 +253,7 @@ def scrape_teams(logger):
 	logger.info("Start scraping team data")
 
 	teamListParser = TeamListParser()
-	url = "https://vrmasterleague.com/EchoArena/Standings/N2xDeWlHMGUvZGc90?rankMin="
+	url = "https://vrmasterleague.com/EchoArena/Standings/bMvm-nOAdg-ofBzJfEr3ag2?rankMin="
 	numberOfTeams = 110
 	counter = 0
 	while counter < numberOfTeams:
