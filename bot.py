@@ -337,31 +337,31 @@ async def on_member_join(member):
 	await actions.update_roles_for_guild(member.guild)
 
 
-@tasks.loop(hours=2)
-async def update_rankings():
-	actions.update_teams_data()
-	await actions.update_ranking()
-	await actions.update_colors()
+#@tasks.loop(hours=2)
+#async def update_rankings():
+#	actions.update_teams_data()
+#	await actions.update_ranking()
+#	await actions.update_colors()
 
-@update_rankings.before_loop
-async def before_update_rankings():
-	await client.wait_until_ready()
+#@update_rankings.before_loop
+#async def before_update_rankings():
+#	await client.wait_until_ready()
 
 
-@tasks.loop(hours=24)
-async def update_players():
-	actions.update_player_data()
-	await actions.update_roles()
+#@tasks.loop(hours=24)
+#async def update_players():
+#	actions.update_player_data()
+#	await actions.update_roles()
 
-@update_players.before_loop
-async def before_update_players():
-	await client.wait_until_ready()
+#@update_players.before_loop
+#async def before_update_players():
+#	await client.wait_until_ready()
 
 #actions.update_teams_data()
 
 #actions.load_teams_data()
 #actions.load_player_data()
 
-update_players.start()
-update_rankings.start()
+#update_players.start()
+#update_rankings.start()
 client.run(AUTH_TOKEN)
