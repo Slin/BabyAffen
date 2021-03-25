@@ -78,10 +78,12 @@ class BotActions:
 			player = None
 			if playerDiscordHandle in self.playerData:
 				player = self.playerData[playerDiscordHandle]
-			if player:
+			if player and player["teamID"] in self.teamsData:
 				team = self.teamsData[player["teamID"]]
 				teamName = team["name"]
 				teamDivision = 'VRML ' + team["division"]
+
+				self.logger.info("Handling player " + playerDiscordHandle + " from team " + teamName)
 
 				playerRolesToAdd = []
 				playerRolesToDelete = []
@@ -146,14 +148,18 @@ class BotActions:
 			return
 
 		clientRolePosition = 0
+		botRole = None
 		for role in guild.roles:
 			if role.name == 'Echo EU - VRML Bridge':
+				botRole = role
 				clientRolePosition = role.position
+				print("bot position: " + str(clientRolePosition))
 				break
 
 		vrmlRoles = {}
 		rolesToRemove = []
 		for role in guild.roles:
+			print("Role: " + role.name + " - " + str(role.position))
 			if role.position < clientRolePosition and role.position != 0:
 				if role.name in vrmlRoles:
 					rolesToRemove.append(role)
@@ -180,6 +186,10 @@ class BotActions:
 		teamPositionDict = {}
 		for position, role in enumerate(newTeamsList):
 			teamPositionDict[role] = position
+
+		#This hopefully reorders everything, so they are not all on position 1 and hopefully also increases the bots role position in case of new roles being added
+		if len(newTeamsList) > 0:
+			await newTeamsList[0].edit(position=0)
 
 		print(teamPositionDict)
 		await guild.edit_role_positions(positions=teamPositionDict)
@@ -219,7 +229,7 @@ class BotActions:
 		for key in self.teamsData:
 			team = self.teamsData[key]
 			if team['name'] in allRoles:
-				if team['position'] <= 10: #is top 10 team
+				if team['division'] == 'Master': #is top 10 team
 					color = ColorHash(team['name'])
 					await allRoles[team['name']].edit(colour=discord.Colour.from_rgb(color.rgb[0], color.rgb[1], color.rgb[2]))
 				else:
@@ -286,6 +296,28 @@ async def on_message(message):
 
 	if not type(message.author) is discord.Member or not message.author.guild_permissions.administrator:
 		return
+
+	#Downloads new data and updates roles and users accordingly
+	if message.content.startswith('!update_all'):
+		await message.channel.send("started scraping players")
+		actions.update_player_data()
+		await message.channel.send("finished scraping players")
+
+		await message.channel.send("started scraping teams")
+		actions.update_teams_data()
+		await message.channel.send("finished scraping teams")
+
+		await message.channel.send("started updating roles")
+		await actions.update_roles_for_guild(message.guild)
+		await message.channel.send("finished updating roles")
+
+		await message.channel.send("started updating ranking")
+		await actions.update_ranking_for_guild(message.guild)
+		await message.channel.send("finished updating ranking")
+
+		await message.channel.send("started updating colors")
+		await actions.update_colors_for_guild(message.guild)
+		await message.channel.send("finished updating colors")
 
 	#Create new team and division roles for everyone / update them if they changed
 	if message.content.startswith('!update_roles'):
