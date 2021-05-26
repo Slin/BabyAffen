@@ -110,7 +110,7 @@ class BotActions:
 						if role.position < clientRolePosition and role.position != 0 and not role in divisionRoles:
 							playerRolesToDelete.append(role)
 
-				if not teamDivision in memberRoleNames:
+				if not teamDivision in memberRoleNames and not "NoDivision" in memberRoleNames:
 					tierRole = None
 					if teamDivision in existingRoles:
 						tierRole = existingRoles[teamDivision]
@@ -179,7 +179,7 @@ class BotActions:
 			if role.position < clientRolePosition and role.position != 0:
 				if role.name in vrmlRoles:
 					rolesToRemove.append(role)
-				else:
+				elif role.name != "@everyone":
 					vrmlRoles[role.name] = role
 
 		newTeamsList = []
@@ -201,18 +201,18 @@ class BotActions:
 		newTeamsList.reverse()
 		teamPositionDict = {}
 		for position, role in enumerate(newTeamsList):
-			teamPositionDict[role] = position
-
-		#This hopefully reorders everything, so they are not all on position 1 and hopefully also increases the bots role position in case of new roles being added
-		if len(newTeamsList) > 0:
-			await newTeamsList[0].edit(position=0)
-
-		print(teamPositionDict)
-		await guild.edit_role_positions(positions=teamPositionDict)
+			teamPositionDict[role] = position + 1
 
 		for role in rolesToRemove:
 			self.logger.info("deleting unexpected role: " + role.name)
 			await role.delete()
+
+		#This hopefully reorders everything, so they are not all on position 1 and hopefully also increases the bots role position in case of new roles being added
+		if len(newTeamsList) > 0:
+			await newTeamsList[0].edit(position=1)
+
+		print(teamPositionDict)
+		await guild.edit_role_positions(positions=teamPositionDict)
 
 		self.logger.info("finished updating team ranking")
 

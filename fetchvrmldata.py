@@ -1,4 +1,5 @@
 import requests
+from requests_futures.sessions import FuturesSession
 import time
 from html.parser import HTMLParser
 import json
@@ -165,55 +166,6 @@ class TeamListParser(HTMLParser):
 		if self.isInTeamName:
 			self.teamNames.append(str(data).replace('\\', ''))
 
-'''
-class MatchesListParser(HTMLParser):
-	def __init__(self):
-		HTMLParser.__init__(self)
-		self.isInTeamName = False
-		self.isInTeamPosition = False
-		self.isInTeamDivision = False
-		self.teamIDs = []
-		self.teamNames = []
-		self.teamLogos = []
-		self.teamPositions = []
-		self.teamDivisions = []
-
-	def handle_starttag(self, tag, attrs):
-		if tag == "td" and len(attrs) > 0 and attrs[0][1] == "pos_cell":
-			self.isInTeamPosition = True
-
-		if tag == "td" and len(attrs) > 0 and attrs[0][1] == "div_cell":
-			self.isInTeamDivision = True
-
-		if tag == "a" and len(attrs) > 1 and attrs[1][1] == "team_link":
-			self.teamIDs.append(str(attrs[0][1]))
-
-		if tag == "img" and len(attrs) > 1 and attrs[1][1] == "team_logo":
-			self.teamLogos.append(str(attrs[0][1]))
-
-		if tag == "span" and len(attrs) > 0 and attrs[0][1] == "team_name":
-			self.isInTeamName = True
-
-		if tag == "img" and self.isInTeamDivision:
-			self.teamDivisions.append(str(attrs[1][1]))
-
-	def handle_endtag(self, tag):
-		if self.isInTeamPosition and tag == "td":
-			self.isInTeamPosition = False
-
-		if self.isInTeamDivision and tag == "td":
-			self.isInTeamDivision = False
-
-		if self.isInTeamName and tag == "span":
-			self.isInTeamName = False
-
-	def handle_data(self, data):
-		if self.isInTeamPosition:
-			self.teamPositions.append(int(data))
-
-		if self.isInTeamName:
-			self.teamNames.append(str(data).replace('\\', ''))
-'''
 
 def scrape_players(logger):
 	logger.info("Start scraping player data")
@@ -228,20 +180,26 @@ def scrape_players(logger):
 		playerListParser.feed(str(response.content))
 		numberOfPlayers = playerListParser.playerCount
 		counter += 99
-		time.sleep(1)
+		#time.sleep(1)
 
 	logger.info("Total number of players: " + str(numberOfPlayers))
 	logger.info("Number of EU players: " + str(len(playerListParser.players)))
+
+	session = FuturesSession(max_workers=100)
+	futures = []
+	for player in playerListParser.players:
+		futures.append(session.get("https://vrmasterleague.com" + player))
+
 	playerData = {}
 	for i, player in enumerate(playerListParser.players):
+		response = futures[i].result()
 		playerParser = PlayerParser()
-		response = requests.get("https://vrmasterleague.com" + player)
 		playerParser.feed(str(response.content))
 		if not playerParser.discordID or playerParser.discordID == "Unlinked":
 			continue
 
 		playerData[playerParser.discordID] = {"teamID": playerListParser.teams[i], "name": playerListParser.names[i], "country": playerListParser.countries[i], "logo": playerParser.logo}
-		time.sleep(1)
+		#time.sleep(1)
 
 	logger.info("Scraped all player data")
 
@@ -260,7 +218,7 @@ def scrape_teams(logger):
 		response = requests.get(url + str(counter))
 		teamListParser.feed(str(response.content))
 		counter += 99
-		time.sleep(1)
+		#time.sleep(1)
 
 	teamData = {}
 	for i, teamID in enumerate(teamListParser.teamIDs):
@@ -270,28 +228,4 @@ def scrape_teams(logger):
 
 	with open('teamsdata.json', 'w') as outfile:
 		json.dump(teamData, outfile)
-
-'''
-def scrape_teams(logger):
-	print("Start scraping team data")
-
-	teamListParser = TeamListParser()
-	url = "https://vrmasterleague.com/EchoArena/Standings/N2xDeWlHMGUvZGc90?rankMin="
-	numberOfTeams = 110
-	counter = 0
-	while counter < numberOfTeams:
-		response = requests.get(url + str(counter))
-		teamListParser.feed(str(response.content))
-		counter += 99
-		time.sleep(1)
-
-	teamData = {}
-	for i, teamID in enumerate(teamListParser.teamIDs):
-		teamData[teamID] = {'position': teamListParser.teamPositions[i], 'name': teamListParser.teamNames[i], 'logo': teamListParser.teamLogos[i], 'division': teamListParser.teamDivisions[i]}
-
-	print("Scraped all team data")
-
-	with open('teamsdata.json', 'w') as outfile:
-		json.dump(teamData, outfile)
-'''
 
