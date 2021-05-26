@@ -57,9 +57,16 @@ class BotActions:
 				clientRolePosition = role.position
 				break
 
+		existingRoles = {}
+		for role in guild.roles:
+			if role.position < clientRolePosition:
+				existingRoles[role.name] = role
+				print(role.name)
+
 		divisionRoles = []
 		rolesToDelete = []
-		for role in guild.roles:
+		for key in existingRoles:
+			role = existingRoles[key]
 			if role.position < clientRolePosition and role.position != 0:
 				rolesToDelete.append(role.name)
 			if role.name == 'VRML Master':
@@ -89,19 +96,27 @@ class BotActions:
 				playerRolesToDelete = []
 				memberRoleNames = [x.name for x in member.roles]
 				if not teamName in memberRoleNames:
-					teamRole = next((x for x in guild.roles if x.name == teamName), None)
-					if not teamRole:
+					#Assign team name role if not there yet
+					teamRole = None
+					if teamName in existingRoles:
+						teamRole = existingRoles[teamName]
+					else:
 						teamRole = await guild.create_role(name=teamName, hoist=True, mentionable=True)
+						existingRoles[teamName] = teamRole
 						self.logger.info("created new role for team: " + teamName)
 					playerRolesToAdd.append(teamRole)
+					#Remove any other team role that may be assigned from before
 					for role in member.roles:
 						if role.position < clientRolePosition and role.position != 0 and not role in divisionRoles:
 							playerRolesToDelete.append(role)
 
 				if not teamDivision in memberRoleNames:
-					tierRole = next((x for x in guild.roles if x.name == teamDivision), None)
-					if not tierRole:
+					tierRole = None
+					if teamDivision in existingRoles:
+						tierRole = existingRoles[teamDivision]
+					else:
 						tierRole = await guild.create_role(name=teamDivision, hoist=False, mentionable=True)
+						existingRoles[teamDivision] = tierRole
 					playerRolesToAdd.append(tierRole)
 					for role in member.roles:
 						if role in divisionRoles:
@@ -127,8 +142,9 @@ class BotActions:
 
 		for roleName in rolesToDelete:
 			self.logger.info("deleting role: " + roleName)
-			role = next((x for x in guild.roles if x.name == roleName), None)
-			await role.delete()
+			if roleName in existingRoles:
+				role = existingRoles[roleName]
+				await role.delete()
 
 		self.logger.info("finished updating user roles")
 
