@@ -185,7 +185,7 @@ def scrape_players(logger):
 	logger.info("Total number of players: " + str(numberOfPlayers))
 	logger.info("Number of EU players: " + str(len(playerListParser.players)))
 
-	session = FuturesSession(max_workers=100)
+	session = FuturesSession(max_workers=4)
 	futures = []
 	for player in playerListParser.players:
 		futures.append(session.get("https://vrmasterleague.com" + player))
@@ -193,13 +193,17 @@ def scrape_players(logger):
 	playerData = {}
 	for i, player in enumerate(playerListParser.players):
 		response = futures[i].result()
+
+		if str(response.content).find("error") != -1:
+			logger.info("error fetching user: " + str(response.content))
+
 		playerParser = PlayerParser()
 		playerParser.feed(str(response.content))
 		if not playerParser.discordID or playerParser.discordID == "Unlinked":
 			continue
 
+		logger.info(playerParser.discordID)
 		playerData[playerParser.discordID] = {"teamID": playerListParser.teams[i], "name": playerListParser.names[i], "country": playerListParser.countries[i], "logo": playerParser.logo}
-		#time.sleep(1)
 
 	logger.info("Scraped all player data")
 
