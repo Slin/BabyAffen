@@ -11,6 +11,7 @@ class BotActions:
 		self.playerData = []
 		self.teamsData = []
 		self.logger = logger
+		self.divisions = ["Master", "Diamond", "Platinum", "Gold", "Silver", "Bronze"]
 
 
 	def load_player_data(self):
@@ -69,16 +70,9 @@ class BotActions:
 			role = existingRoles[key]
 			if role.position < clientRolePosition and role.position != 0:
 				rolesToDelete.append(role.name)
-			if role.name == 'VRML Master':
-				divisionRoles.append(role)
-			if role.name == 'VRML Diamond':
-				divisionRoles.append(role)
-			if role.name == 'VRML Gold':
-				divisionRoles.append(role)
-			if role.name == 'VRML Silver':
-				divisionRoles.append(role)
-			if role.name == 'VRML Bronze':
-				divisionRoles.append(role)
+			for division in self.divisions:
+				if "VRML " + division == role.name:
+					divisionRoles.append(role)
 
 		for member in guild.members:
 			playerDiscordHandle = member.name + "#" + member.discriminator
@@ -89,6 +83,13 @@ class BotActions:
 				team = self.teamsData[player["teamID"]]
 				teamName = team["name"]
 				teamDivision = 'VRML ' + team["division"]
+				foundDivision = False
+				for division in self.divisionRoles:
+					if teamDivision.hasPrefix(division):
+						teamDivision = division
+						foundDivision = True
+				if not foundDivision:
+					teamDivision = None
 
 				self.logger.info("Handling player " + playerDiscordHandle + " from team " + teamName)
 
@@ -110,7 +111,7 @@ class BotActions:
 						if role.position < clientRolePosition and role.position != 0 and not role in divisionRoles:
 							playerRolesToDelete.append(role)
 
-				if not teamDivision in memberRoleNames and not "NoDivision" in memberRoleNames:
+				if teamDivision and not teamDivision in memberRoleNames and not "NoDivision" in memberRoleNames:
 					tierRole = None
 					if teamDivision in existingRoles:
 						tierRole = existingRoles[teamDivision]
@@ -189,9 +190,8 @@ class BotActions:
 			if teamName in vrmlRoles:
 				newTeamsList.append(vrmlRoles[teamName])
 
-		divisions = ["VRML Master", "VRML Diamond", "VRML Gold", "VRML Silver", "VRML Bronze"]
-		for division in divisions:
-			if division in vrmlRoles:
+		for division in self.divisions:
+			if ("VRML " + division) in vrmlRoles:
 				newTeamsList.append(vrmlRoles[division])
 
 		for role in vrmlRoles:
