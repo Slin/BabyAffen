@@ -64,6 +64,10 @@ class BotActions:
 				existingRoles[role.name] = role
 				print(role.name)
 
+		divisionNames = []
+		for division in self.divisions:
+			divisionNames.append("VRML " + division)
+
 		divisionRoles = []
 		rolesToDelete = []
 		for key in existingRoles:
@@ -84,8 +88,8 @@ class BotActions:
 				teamName = team["name"]
 				teamDivision = 'VRML ' + team["division"]
 				foundDivision = False
-				for division in self.divisionRoles:
-					if teamDivision.hasPrefix(division):
+				for division in divisionNames:
+					if teamDivision.startswith(division):
 						teamDivision = division
 						foundDivision = True
 				if not foundDivision:
@@ -103,6 +107,7 @@ class BotActions:
 						teamRole = existingRoles[teamName]
 					else:
 						teamRole = await guild.create_role(name=teamName, hoist=True, mentionable=True)
+						await teamRole.edit(position=1)
 						existingRoles[teamName] = teamRole
 						self.logger.info("created new role for team: " + teamName)
 					playerRolesToAdd.append(teamRole)
@@ -117,7 +122,9 @@ class BotActions:
 						tierRole = existingRoles[teamDivision]
 					else:
 						tierRole = await guild.create_role(name=teamDivision, hoist=False, mentionable=True)
+						await tierRole.edit(position=1)
 						existingRoles[teamDivision] = tierRole
+						divisionRoles.append(tierRole)
 					playerRolesToAdd.append(tierRole)
 					for role in member.roles:
 						if role in divisionRoles:
@@ -153,7 +160,7 @@ class BotActions:
 	#Update the order of team roles to match the VRML EU ranking
 	async def update_ranking(self):
 		for guild in self.client.guilds:
-			await self.update_roles_for_guild(guild)
+			await self.update_ranking_for_guild(guild)
 
 
 	#Update the order of team roles in guild to match the VRML EU ranking
@@ -191,8 +198,9 @@ class BotActions:
 				newTeamsList.append(vrmlRoles[teamName])
 
 		for division in self.divisions:
-			if ("VRML " + division) in vrmlRoles:
-				newTeamsList.append(vrmlRoles[division])
+			divisionName = "VRML " + division
+			if divisionName in vrmlRoles:
+				newTeamsList.append(vrmlRoles[divisionName])
 
 		for role in vrmlRoles:
 			if not vrmlRoles[role] in newTeamsList:
@@ -206,10 +214,6 @@ class BotActions:
 		for role in rolesToRemove:
 			self.logger.info("deleting unexpected role: " + role.name)
 			await role.delete()
-
-		#This hopefully reorders everything, so they are not all on position 1 and hopefully also increases the bots role position in case of new roles being added
-		if len(newTeamsList) > 0:
-			await newTeamsList[0].edit(position=1)
 
 		print(teamPositionDict)
 		await guild.edit_role_positions(positions=teamPositionDict)
