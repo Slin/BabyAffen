@@ -15,13 +15,19 @@ class BotActions:
 
 
 	def load_player_data(self):
-		with open('playerdata.json') as file:
-			self.playerData = json.load(file)
+		try:
+			with open('playerdata.json') as file:
+				self.playerData = json.load(file)
+		except FileNotFoundError:
+			print('File does not exist')
 
 
 	def load_teams_data(self):
-		with open('teamsdata.json') as file:
-			self.teamsData = json.load(file)
+		try:
+			with open('teamsdata.json') as file:
+				self.teamsData = json.load(file)
+		except FileNotFoundError:
+			print('File does not exist')
 
 
 	def update_teams_data(self):

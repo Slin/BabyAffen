@@ -171,7 +171,7 @@ def scrape_players(logger):
 	logger.info("Start scraping player data")
 
 	playerListParser = PlayerListParser()
-	url = "https://vrmasterleague.com/EchoArena/Players/List/?posMin="
+	url = "https://vrmasterleague.com/EchoArena/Players/?posMin="
 	numberOfPlayers = 1
 	counter = 0
 	while counter < numberOfPlayers:
@@ -215,7 +215,7 @@ def scrape_teams(logger):
 	logger.info("Start scraping team data")
 
 	teamListParser = TeamListParser()
-	url = "https://vrmasterleague.com/EchoArena/Standings/bMvm-nOAdg-ofBzJfEr3ag2?rankMin="
+	url = "https://vrmasterleague.com/EchoArena/Standings/EU?rankMin="
 	numberOfTeams = 110
 	counter = 0
 	while counter < numberOfTeams:
