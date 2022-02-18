@@ -137,11 +137,11 @@ class TeamListParser(HTMLParser):
 		if tag == "td" and len(attrs) > 0 and attrs[0][1] == "div_cell":
 			self.isInTeamDivision = True
 
-		if tag == "a" and len(attrs) > 1 and attrs[1][1] == "team_link":
-			self.teamIDs.append(str(attrs[0][1]))
+		if tag == "a" and len(attrs) > 1 and attrs[0][1] == "team_link":
+			self.teamIDs.append(str(attrs[1][1]))
 
-		if tag == "img" and len(attrs) > 1 and attrs[1][1] == "team_logo":
-			self.teamLogos.append(str(attrs[0][1]))
+		if tag == "img" and len(attrs) > 1 and attrs[0][1].strip() == "team_logo":
+			self.teamLogos.append(str(attrs[1][1]))
 
 		if tag == "span" and len(attrs) > 0 and attrs[0][1] == "team_name":
 			self.isInTeamName = True
@@ -164,7 +164,9 @@ class TeamListParser(HTMLParser):
 			self.teamPositions.append(int(data))
 
 		if self.isInTeamName:
-			self.teamNames.append(str(data).replace('\\', ''))
+			teamName = str(data).replace('\\', '')
+			print(teamName)
+			self.teamNames.append(teamName)
 
 
 def scrape_players(logger):
@@ -216,7 +218,7 @@ def scrape_teams(logger):
 
 	teamListParser = TeamListParser()
 	url = "https://vrmasterleague.com/EchoArena/Standings/EU?rankMin="
-	numberOfTeams = 110
+	numberOfTeams = 150
 	counter = 0
 	while counter < numberOfTeams:
 		response = requests.get(url + str(counter))
