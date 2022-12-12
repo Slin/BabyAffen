@@ -84,11 +84,13 @@ class BotActions:
 				if "VRML " + division == role.name:
 					divisionRoles.append(role)
 
+		print(self.playerData)
+
 		for member in guild.members:
-			playerDiscordHandle = member.name + "#" + member.discriminator
+			playerDiscordID = str(member.id)
 			player = None
-			if playerDiscordHandle in self.playerData:
-				player = self.playerData[playerDiscordHandle]
+			if playerDiscordID in self.playerData:
+				player = self.playerData[playerDiscordID]
 			if player and player["teamID"] in self.teamsData:
 				team = self.teamsData[player["teamID"]]
 				teamName = team["name"]
@@ -101,7 +103,7 @@ class BotActions:
 				if not foundDivision:
 					teamDivision = None
 
-				self.logger.info("Handling player " + playerDiscordHandle + " from team " + teamName)
+				self.logger.info("Handling player " + member.name + " from team " + teamName)
 
 				playerRolesToAdd = []
 				playerRolesToDelete = []
@@ -137,7 +139,7 @@ class BotActions:
 							playerRolesToDelete.append(role)
 
 				if len(playerRolesToAdd) > 0:
-					self.logger.info("updating: " + playerDiscordHandle + " - " + teamName + " - " + teamDivision)
+					self.logger.info("updating: " + member.name + " - " + teamName + " - " + teamDivision)
 					await member.add_roles(*playerRolesToAdd)
 
 				if len(playerRolesToDelete) > 0:
@@ -151,7 +153,7 @@ class BotActions:
 			else:
 				playerVRMLRoles = [x for x in member.roles if x.position < clientRolePosition and x.position != 0]
 				if len(playerVRMLRoles) > 0:
-					self.logger.info("removing vrml roles for " + playerDiscordHandle)
+					self.logger.info("removing vrml roles for " + member.name)
 					await member.remove_roles(*playerVRMLRoles)
 
 		for roleName in rolesToDelete:
@@ -255,7 +257,7 @@ class BotActions:
 		for key in self.teamsData:
 			team = self.teamsData[key]
 			if team['name'] in allRoles:
-				if team['division'] == 'Master': #is top 10 team
+				if team['position'] <= 10: #is top 10 team
 					color = ColorHash(team['name'])
 					await allRoles[team['name']].edit(colour=discord.Colour.from_rgb(color.rgb[0], color.rgb[1], color.rgb[2]))
 				else:
@@ -317,10 +319,10 @@ async def on_ready():
 
 @client.event
 async def on_message(message):
-	if message.author == client.user:
+	if message.author == client.user and not message.content.startswith('!update_all'):
 		return
 
-	if not type(message.author) is discord.Member or not message.author.guild_permissions.administrator:
+	if (not type(message.author) is discord.Member or not message.author.guild_permissions.administrator) and not message.author.id == 717431243662295150:
 		return
 
 	#Downloads new data and updates roles and users accordingly
@@ -416,10 +418,12 @@ async def on_member_join(member):
 #	await client.wait_until_ready()
 
 #actions.update_teams_data()
+#actions.update_player_data()
 
 actions.load_teams_data()
 actions.load_player_data()
 
 #update_players.start()
 #update_rankings.start()
+
 client.run(AUTH_TOKEN)
