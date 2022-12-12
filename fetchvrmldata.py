@@ -1,171 +1,74 @@
 import requests
 from requests_futures.sessions import FuturesSession
 import time
-from html.parser import HTMLParser
 import json
 import logging
 
-class PlayerListParser(HTMLParser):
+class PlayerListParser:
 	def __init__(self):
-		HTMLParser.__init__(self)
-		self.isInPlayerCount = False
-		self.isInTable = False
-		self.isInTableRow = False
-		self.isInCountryCell = False
-		self.isInPlayerCell = False
-		self.isInPlayerNameCell = False
-		self.didHaveName = False
-		self.isInTeamCell = False
-		self.isEUPlayer = False
-
 		self.playerCount = 0
-		self.players = []
+		self.playerIDs = []
 		self.teams = []
 		self.names = []
 		self.countries = []
 
-	def handle_starttag(self, tag, attrs):
-		if tag == "div" and len(attrs) > 0 and len(attrs[0]) > 0 and attrs[0][1] == "players-list-header-count":
-			self.isInPlayerCount = True
+	def parse(self, data):
+		parsedData = json.loads(data.decode('utf8'))
+		playersData = parsedData["players"]
 
-		if self.isInCountryCell and tag == "img":
-			if attrs[2][1] in ['AL','AD','AT','AZ','BY','BE','BA','BG','HR','CY','CZ','DK','EE','FI','FR','GE','DE','GR','HU','IS','IE', 'IT','KZ','XK','LV','LI','LT','LU','MK','MT','MD','MC','ME','NL','NO','PL','PT','RO','RU','SM','RS','SK', 'SI','ES','SE','CH','TR','UA','GB','VA', 'JE', 'RU']:
-				self.isEUPlayer = True
-				self.countries.append(str(attrs[2][1]))
+		if "total" in parsedData:
+			self.playerCount = parsedData["total"]
 
-		if self.isInPlayerCell and tag == "a" and self.isEUPlayer:
-			self.players.append(str(attrs[0][1]))
+		for player in playersData:
+			if not player["country"] in ['AL','AD','AT','AZ','BY','BE','BA','BG','HR','CY','CZ','DK','EE','FI','FR','GE','DE','GR','HU','IS','IE', 'IT','KZ','XK','LV','LI','LT','LU','MK','MT','MD','MC','ME','NL','NO','PL','PT','RO','RU','SM','RS','SK', 'SI','ES','SE','CH','TR','UA','GB','VA', 'JE', 'RU']:
+				continue
 
-		if self.isInTeamCell and tag == "a" and self.isEUPlayer:
-			self.teams.append(str(attrs[0][1]))
-
-		if self.playerCount > 0 and tag == "tbody":
-			self.isInTable = True
-
-		if self.isInTable and tag == "tr" and attrs[0][1].startswith("vrml_table_row"):
-			self.isInTableRow = True
-
-		if self.isInTable and tag == "td" and attrs[0][1] == "country_cell":
-			self.isInCountryCell = True
-
-		if self.isInTable and tag == "td" and attrs[0][1] == "player_cell":
-			self.isInPlayerCell = True
-
-		if self.isInTable and tag == "td" and attrs[0][1] == "team_cell":
-			self.isInTeamCell = True
-
-		if self.isInPlayerCell and tag == "span":
-			self.isInPlayerNameCell = True
-
-	def handle_endtag(self, tag):
-		if tag == "div" and self.isInPlayerCount:
-			self.isInPlayerCount = False
-
-		if tag == "td" and self.isInCountryCell:
-			self.isInCountryCell = False
-
-		if tag == "td" and self.isInPlayerCell:
-			self.isInPlayerCell = False
-
-		if tag == "td" and self.isInTeamCell:
-			self.isInTeamCell = False
-
-		if tag == "tbody" and self.isInTable:
-			self.isInTable = False
-
-		if tag == "tr" and self.isInTableRow:
-			self.isInTableRow = False
-			self.isEUPlayer = False
-
-		if tag == "span" and self.isInPlayerNameCell:
-			self.isInPlayerNameCell = False
-			if not self.didHaveName and self.isEUPlayer:
+			self.countries.append(player["country"])
+			self.playerIDs.append(player["playerID"])
+			self.teams.append(player["teamID"])
+			if "playerName" in player:
+				self.names.append(str(player["playerName"]).replace('\\', ''))
+			else:
 				self.names.append("No Name")
 
-	def handle_data(self, data):
-		if self.isInPlayerCount:
-			numbers = [int(s) for s in str(data).split() if s.isdigit()]
-			if len(numbers) > 0:
-				self.playerCount = numbers[0]
 
-		if self.isInPlayerNameCell and self.isEUPlayer:
-			self.didHaveName = True
-			self.names.append(str(data).replace('\\', ''))
-
-
-class PlayerParser(HTMLParser):
+class PlayerParser:
 	def __init__(self):
-		HTMLParser.__init__(self)
-		self.foundData = False
-		self.isInsideTag = False
-
 		self.discordID = None
 		self.logo = None
 
-	def handle_starttag(self, tag, attrs):
-		if self.foundData and tag == "td" and not self.discordID:
-			self.isInsideTag = True
+	def parse(self, data):
+		parsedData = json.loads(data)
+		playerData = parsedData["user"]
 
-		if tag == "img" and len(attrs) > 1 and attrs[1][1] == "player_logo":
-			self.logo = attrs[0][1]
-
-	def handle_data(self, data):
-		if self.isInsideTag:
-			self.discordID = str(data)
-			self.isInsideTag = False
-
-		if data == "Discord":
-			self.foundData = True
+		if "discordID" in playerData:
+			self.discordID = playerData["discordID"]
+		if "userLogo" in playerData:
+			self.logo = playerData["userLogo"]
 
 
-class TeamListParser(HTMLParser):
+class TeamListParser:
 	def __init__(self):
-		HTMLParser.__init__(self)
-		self.isInTeamName = False
-		self.isInTeamPosition = False
-		self.isInTeamDivision = False
 		self.teamIDs = []
 		self.teamNames = []
 		self.teamLogos = []
 		self.teamPositions = []
 		self.teamDivisions = []
+		self.noMoreData = False
 
-	def handle_starttag(self, tag, attrs):
-		if tag == "td" and len(attrs) > 0 and attrs[0][1] == "pos_cell":
-			self.isInTeamPosition = True
+	def parse(self, data):
+		parsedData = json.loads(data)
+		teamsData = parsedData["teams"]
 
-		if tag == "td" and len(attrs) > 0 and attrs[0][1] == "div_cell":
-			self.isInTeamDivision = True
+		if len(teamsData) < 100:
+			self.noMoreData = True
 
-		if tag == "a" and len(attrs) > 1 and attrs[0][1] == "team_link":
-			self.teamIDs.append(str(attrs[1][1]))
-
-		if tag == "img" and len(attrs) > 1 and attrs[0][1].strip() == "team_logo":
-			self.teamLogos.append(str(attrs[1][1]))
-
-		if tag == "span" and len(attrs) > 0 and attrs[0][1] == "team_name":
-			self.isInTeamName = True
-
-		if tag == "img" and self.isInTeamDivision:
-			self.teamDivisions.append(str(attrs[1][1]))
-
-	def handle_endtag(self, tag):
-		if self.isInTeamPosition and tag == "td":
-			self.isInTeamPosition = False
-
-		if self.isInTeamDivision and tag == "td":
-			self.isInTeamDivision = False
-
-		if self.isInTeamName and tag == "span":
-			self.isInTeamName = False
-
-	def handle_data(self, data):
-		if self.isInTeamPosition:
-			self.teamPositions.append(int(data))
-
-		if self.isInTeamName:
-			teamName = str(data).replace('\\', '')
-			print(teamName)
+		for team in teamsData:
+			self.teamIDs.append(team["teamID"])
+			self.teamLogos.append(team["teamLogo"])
+			self.teamDivisions.append(team["divisionName"])
+			self.teamPositions.append(team["rank"])
+			teamName = str(team["teamName"]).replace('\\', '') #Not sure if this is actually still needed when using the API instead of scraping from html...
 			self.teamNames.append(teamName)
 
 
@@ -173,34 +76,39 @@ def scrape_players(logger):
 	logger.info("Start scraping player data")
 
 	playerListParser = PlayerListParser()
-	url = "https://vrmasterleague.com/EchoArena/Players/?posMin="
-	numberOfPlayers = 1
-	counter = 0
+	url = "https://api.vrmasterleague.com/EchoArena/Players?posMin="
+	numberOfPlayers = 2
+	counter = 1
 	while counter < numberOfPlayers:
 		playerListParser.playerCount = 0
 		response = requests.get(url + str(counter))
-		playerListParser.feed(str(response.content))
+		if response.status_code == 429:
+			#was rate limited, wait until the rate limit is reset and try again
+			time.sleep(float(response.headers["X-RateLimit-Reset-After"]))
+			continue
+		playerListParser.parse(response.content)
 		numberOfPlayers = playerListParser.playerCount
-		counter += 99
-		#time.sleep(1)
+		counter += 100
 
 	logger.info("Total number of players: " + str(numberOfPlayers))
-	logger.info("Number of EU players: " + str(len(playerListParser.players)))
+	logger.info("Number of EU players: " + str(len(playerListParser.playerIDs)))
 
-	session = FuturesSession(max_workers=4)
+	session = FuturesSession(max_workers=16)
 	futures = []
-	for player in playerListParser.players:
-		futures.append(session.get("https://vrmasterleague.com" + player))
+	for playerID in playerListParser.playerIDs:
+		futures.append(session.get("https://api.vrmasterleague.com/Players/" + playerID))
 
 	playerData = {}
-	for i, player in enumerate(playerListParser.players):
+	for i, playerID in enumerate(playerListParser.playerIDs):
 		response = futures[i].result()
 
-		if str(response.content).find("error") != -1:
-			logger.info("error fetching user: " + str(response.content))
+		if response.status_code != 200:
+			logger.info("error fetching user: " + response.content.decode('utf8'))
+			print(response.status_code)
+			print(response.headers)
 
 		playerParser = PlayerParser()
-		playerParser.feed(str(response.content))
+		playerParser.parse(response.content.decode('utf8'))
 		if not playerParser.discordID or playerParser.discordID == "Unlinked":
 			continue
 
@@ -217,13 +125,16 @@ def scrape_teams(logger):
 	logger.info("Start scraping team data")
 
 	teamListParser = TeamListParser()
-	url = "https://vrmasterleague.com/EchoArena/Standings/EU?rankMin="
-	numberOfTeams = 150
-	counter = 0
-	while counter < numberOfTeams:
+	url = "https://api.vrmasterleague.com/EchoArena/Standings?region=EU&rankMin="
+	counter = 1
+	while not teamListParser.noMoreData:
 		response = requests.get(url + str(counter))
-		teamListParser.feed(str(response.content))
-		counter += 99
+		if response.status_code == 429:
+			#was rate limited, wait until the rate limit is reset and try again
+			time.sleep(float(response.headers["X-RateLimit-Reset-After"]))
+			continue
+		teamListParser.parse(response.content.decode('utf8'))
+		counter += 100
 		#time.sleep(1)
 
 	teamData = {}
